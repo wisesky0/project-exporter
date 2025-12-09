@@ -1,0 +1,15 @@
+# macOS 시스템 파일
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# 임시 파일
+*.bak
+*.tmp
+*.swp
+*~
+
+# 프로젝트 export 파일 (선택적)
+# project.b64
+
