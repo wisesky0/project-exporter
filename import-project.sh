@@ -3,11 +3,22 @@
 # Base64로 인코딩된 프로젝트를 복원하는 스크립트
 # 사용법: ./import-project.sh [input-file] [output-directory]
 # 예: ./import-project.sh project.b64 /path/to/restore
+# 예: ./import-project.sh project.b64  # 입력 파일명(확장자 제외)으로 디렉토리 생성
 
 set -e
 
 INPUT_FILE="${1:-project.b64}"
-OUTPUT_DIR="${2:-./restored-project}"
+
+# 출력 디렉토리 결정
+# 두 번째 파라미터가 있으면 사용, 없으면 입력 파일명(확장자 제외) 사용
+if [ -n "$2" ]; then
+    OUTPUT_DIR="$2"
+else
+    # 입력 파일명에서 확장자 제거하여 디렉토리명으로 사용
+    INPUT_BASENAME="$(basename "$INPUT_FILE")"
+    OUTPUT_DIR_NAME="${INPUT_BASENAME%.*}"
+    OUTPUT_DIR="./$OUTPUT_DIR_NAME"
+fi
 
 if [ ! -f "$INPUT_FILE" ]; then
     echo "오류: 입력 파일을 찾을 수 없습니다: $INPUT_FILE"

@@ -2,9 +2,9 @@
 
 # 프로젝트를 base64로 인코딩하는 스크립트
 # 사용법: ./export-project.sh [project-directory] [output-file]
-# 예: ./export-project.sh . project.b64
-# 예: ./export-project.sh /path/to/project project.b64
-# 예: ./export-project.sh  # 현재 디렉토리를 기본값으로 사용
+# 예: ./export-project.sh . custom.b64
+# 예: ./export-project.sh /path/to/project custom.b64
+# 예: ./export-project.sh  # 현재 디렉토리를 기본값으로 사용 (출력: 현재디렉토리명.b64)
 
 set -e
 
@@ -18,15 +18,15 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo ""
     echo "파라미터:"
     echo "  project-directory   내보낼 프로젝트 디렉토리 경로 (기본값: 현재 디렉토리)"
-    echo "  output-file         출력 파일명 (기본값: project.b64)"
+    echo "  output-file         출력 파일명 (기본값: 프로젝트 디렉토리 이름.b64)"
     echo ""
     echo "옵션:"
     echo "  -h, --help          이 도움말을 표시하고 종료"
     echo ""
     echo "사용 예시:"
-    echo "  ./export-project.sh                                    # 현재 디렉토리를 기본값으로 사용"
-    echo "  ./export-project.sh . project.b64                      # 현재 디렉토리를 사용하고 출력 파일명 지정"
-    echo "  ./export-project.sh /path/to/project                   # 특정 프로젝트 디렉토리 지정"
+    echo "  ./export-project.sh                                    # 현재 디렉토리를 기본값으로 사용 (출력: 현재디렉토리명.b64)"
+    echo "  ./export-project.sh . custom.b64                       # 현재 디렉토리를 사용하고 출력 파일명 지정"
+    echo "  ./export-project.sh /path/to/project                   # 특정 프로젝트 디렉토리 지정 (출력: project.b64)"
     echo "  ./export-project.sh /path/to/project custom.b64        # 프로젝트 디렉토리와 출력 파일명 모두 지정"
     echo ""
     echo "참고:"
@@ -40,8 +40,19 @@ CURRENT_DIR="$(pwd)"
 
 # 프로젝트 디렉토리 경로 (첫 번째 파라미터, 없으면 현재 디렉토리)
 PROJECT_DIR="${1:-.}"
-# 출력 파일 (두 번째 파라미터, 없으면 project.b64)
-OUTPUT_FILE_NAME="${2:-project.b64}"
+
+# 프로젝트 디렉토리 경로를 절대 경로로 변환
+PROJECT_ROOT="$(cd "$PROJECT_DIR" && pwd)"
+
+# 출력 파일명 결정
+# 두 번째 파라미터가 있으면 사용, 없으면 프로젝트 디렉토리 이름 사용
+if [ -n "$2" ]; then
+    OUTPUT_FILE_NAME="$2"
+else
+    # 프로젝트 디렉토리 이름을 가져와서 .b64 확장자 추가
+    PROJECT_DIR_NAME="$(basename "$PROJECT_ROOT")"
+    OUTPUT_FILE_NAME="${PROJECT_DIR_NAME}.b64"
+fi
 
 # 출력 파일 경로를 현재 디렉토리 기준으로 설정
 # 사용자가 지정한 파일명/경로를 현재 디렉토리 기준으로 해석
@@ -52,9 +63,6 @@ else
     # 상대 경로 또는 파일명만 있는 경우, 현재 디렉토리 기준으로 생성
     OUTPUT_FILE="$CURRENT_DIR/$OUTPUT_FILE_NAME"
 fi
-
-# 프로젝트 디렉토리 경로를 절대 경로로 변환
-PROJECT_ROOT="$(cd "$PROJECT_DIR" && pwd)"
 
 cd "$PROJECT_ROOT"
 
@@ -81,6 +89,8 @@ tar --exclude='.git' \
     --exclude='import-project.sh' \
     --exclude='._*' \
     --exclude='.DS_Store' \
+    --exclude='allure*/' \
+    --exclude='.*/' \
     --no-xattrs \
     -czf "$TEMP_DIR/project.tar.gz" \
     -C "$PROJECT_ROOT" \
