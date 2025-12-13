@@ -80,7 +80,7 @@ trap "rm -rf $TEMP_DIR" EXIT
 echo "[1/3] 파일 수집 중..."
 # macOS 확장 속성 제외를 위한 환경 변수 설정
 export COPYFILE_DISABLE=1
-tar --exclude='.git' \
+tar --exclude='./.?*' \
     --exclude='target' \
     --exclude='*.bak' \
     --exclude='*.tmp' \
@@ -90,11 +90,24 @@ tar --exclude='.git' \
     --exclude='._*' \
     --exclude='.DS_Store' \
     --exclude='allure*/' \
-    --exclude='.*/' \
     --no-xattrs \
     -czf "$TEMP_DIR/project.tar.gz" \
     -C "$PROJECT_ROOT" \
     .
+
+# 압축된 파일 목록 표시
+echo ""
+echo "압축된 파일 목록:"
+echo "----------------------------------------"
+tar -tzf "$TEMP_DIR/project.tar.gz" | head -50
+FILE_COUNT=$(tar -tzf "$TEMP_DIR/project.tar.gz" | wc -l | tr -d ' ')
+if [ "$FILE_COUNT" -gt 50 ]; then
+    echo "... (총 $FILE_COUNT 개 파일, 상위 50개만 표시)"
+else
+    echo "(총 $FILE_COUNT 개 파일)"
+fi
+echo "----------------------------------------"
+echo ""
 
 # tar 파일을 base64로 인코딩
 echo "[2/3] Base64 인코딩 중..."
