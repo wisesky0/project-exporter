@@ -50,13 +50,32 @@ trap "rm -rf $TEMP_DIR" EXIT
 
 # Base64 디코딩
 echo "[1/3] Base64 디코딩 중..."
+# 먼저 압축된 파일로 시도
 base64 -D -i "$INPUT_FILE" -o "$TEMP_DIR/project.tar.gz" 2>/dev/null || base64 -d < "$INPUT_FILE" > "$TEMP_DIR/project.tar.gz"
+
+# 압축 여부 확인 (gzip 헤더 확인)
+if file "$TEMP_DIR/project.tar.gz" | grep -q "gzip"; then
+    # 압축된 파일
+    USE_COMPRESSION=true
+    TAR_FILE="$TEMP_DIR/project.tar.gz"
+    echo "압축된 파일로 감지됨"
+else
+    # 압축하지 않은 파일 (tar 파일로 다시 디코딩)
+    base64 -D -i "$INPUT_FILE" -o "$TEMP_DIR/project.tar" 2>/dev/null || base64 -d < "$INPUT_FILE" > "$TEMP_DIR/project.tar"
+    USE_COMPRESSION=false
+    TAR_FILE="$TEMP_DIR/project.tar"
+    echo "압축하지 않은 파일로 감지됨"
+fi
 
 # tar 압축 해제
 echo "[2/3] 파일 압축 해제 중..."
 mkdir -p "$OUTPUT_DIR"
 # macOS 확장 속성 무시하고 압축 해제
-tar --exclude='._*' --no-xattrs -xzf "$TEMP_DIR/project.tar.gz" -C "$OUTPUT_DIR" 2>/dev/null || tar -xzf "$TEMP_DIR/project.tar.gz" -C "$OUTPUT_DIR"
+if [ "$USE_COMPRESSION" = true ]; then
+    tar --exclude='._*' --no-xattrs -xzf "$TAR_FILE" -C "$OUTPUT_DIR" 2>/dev/null || tar -xzf "$TAR_FILE" -C "$OUTPUT_DIR"
+else
+    tar --exclude='._*' --no-xattrs -xf "$TAR_FILE" -C "$OUTPUT_DIR" 2>/dev/null || tar -xf "$TAR_FILE" -C "$OUTPUT_DIR"
+fi
 
 # 복원 후 ._ 파일들 정리 (혹시 생성된 경우)
 find "$OUTPUT_DIR" -name "._*" -type f -delete 2>/dev/null || true
