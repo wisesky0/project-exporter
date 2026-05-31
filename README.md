@@ -1,69 +1,80 @@
-# Project Exporter
+# Project Pack/Unpack
 
-프로젝트를 base64로 인코딩하여 단일 파일로 내보내고, 다시 복원할 수 있는 도구입니다.
+프로젝트를 base64 단일 파일로 내보내고 복원하는 도구입니다.
+
+## Convection 규칙
+
+* [Tool Management](~/.dotfiles/docs/tool-management-conventions.md)
+* [Environment Management](~/.dotfiles/docs/environment-management-conventions.md)
+
+### 이 프로젝트의 배포 구조
+
+| 경로 | 역할 |
+|---|---|
+| `~/codespace/tools/pack/` | 소스 코드 (Source of Truth) |
+| `~/.local/opt/pack/` | 배포된 실행 파일 |
+| `~/.local/bin/pack` | 심볼릭 링크 → `pack.sh` |
+| `~/.local/bin/unpack` | 심볼릭 링크 → `unpack.sh` |
+
+소스를 수정한 후 `./deploy.sh`를 실행해야 변경 사항이 시스템에 반영됩니다.
 
 ## 기능
 
-- 프로젝트 디렉토리를 base64로 인코딩된 단일 파일로 내보내기
-- base64로 인코딩된 파일에서 프로젝트 복원하기
-- .git, 빌드 산출물 등 불필요한 파일 자동 제외
+- 프로젝트 디렉토리를 base64 단일 파일로 내보내기
+- base64 파일에서 프로젝트 복원
+- `.git`, 빌드 산출물 등 불필요한 파일 자동 제외
+- `.gitignore` 파일 기반 제외 (루트 및 서브디렉토리 포함)
+- gzip 압축 옵션 지원
 
 ## 사용법
 
-### 프로젝트 내보내기 (Export)
+### 내보내기 (pack)
 
 ```bash
-./export-project.sh [project-directory] [output-file]
+./pack.sh [옵션] [project-dir] [output-file]
 ```
 
-**파라미터:**
-- `project-directory`: 내보낼 프로젝트 디렉토리 경로 (기본값: 현재 디렉토리 `.`)
-- `output-file`: 출력 파일명 (기본값: `project.b64`)
+| 옵션 | 설명 |
+|---|---|
+| `-h, --help` | 도움말 표시 |
+| `-l, --list` | 전체 파일 목록 표시 (기본: 최대 50개) |
+| `-e, --exclude PATTERN` | 추가 제외 패턴 (여러 번 사용 가능) |
+| `-c, --compression LEVEL` | 압축 레벨: `none` (기본값) \| `normal` \| `max` |
 
-**사용 예시:**
-```bash
-# 현재 디렉토리를 프로젝트로 사용 (기본값)
-./export-project.sh
-
-# 현재 디렉토리를 사용하고 출력 파일명 지정
-./export-project.sh . project.b64
-
-# 특정 프로젝트 디렉토리 지정
-./export-project.sh /path/to/project
-
-# 프로젝트 디렉토리와 출력 파일명 모두 지정
-./export-project.sh /path/to/project custom.b64
-```
-
-### 프로젝트 복원하기 (Import)
+- `project-dir`: 내보낼 디렉토리 (기본값: 현재 디렉토리)
+- `output-file`: 출력 파일명 (기본값: `디렉토리명.b64`)
 
 ```bash
-./import-project.sh [input-file] [output-directory]
+./pack.sh                                   # 현재 디렉토리 → 디렉토리명.b64
+./pack.sh /path/to/project                  # 특정 디렉토리
+./pack.sh /path/to/project custom.b64       # 출력 파일명 지정
+./pack.sh -e 'logs' -c max /path/to/project # 추가 제외 + 최대 압축
 ```
 
-**파라미터:**
-- `input-file`: 복원할 base64 인코딩 파일 (기본값: `project.b64`)
-- `output-directory`: 복원할 디렉토리 경로 (기본값: `./restored-project`)
+### 복원하기 (unpack)
 
-**사용 예시:**
 ```bash
-# 기본값으로 복원
-./import-project.sh
-
-# 입력 파일과 출력 디렉토리 지정
-./import-project.sh project.b64 /path/to/restore
+./unpack.sh [input-file] [output-directory]
 ```
 
-## 제외되는 파일/디렉토리
+- `input-file`: 복원할 b64 파일 (기본값: `project.b64`)
+- `output-directory`: 복원 경로 (기본값: `입력파일명` 에서 확장자 제거)
 
-다음 항목들은 자동으로 제외됩니다:
-- `.git` - Git 저장소
-- `target` - 빌드 산출물 디렉토리
-- `*.bak`, `*.tmp` - 임시 파일
-- `export-project.sh`, `import-project.sh` - 스크립트 파일 자체
-- `._*`, `.DS_Store` - macOS 시스템 파일
+```bash
+./unpack.sh                                 # project.b64 → ./project/
+./unpack.sh custom.b64                      # custom.b64  → ./custom/
+./unpack.sh custom.b64 /path/to/restore     # 출력 디렉토리 지정
+```
 
-## 주의사항
+## 자동 제외 항목
 
-- 출력 디렉토리가 이미 존재하는 경우, 덮어쓰기 여부를 확인합니다.
-- 프로젝트 디렉토리 경로는 절대 경로로 변환되어 사용됩니다.
+| 항목 | 설명 |
+|---|---|
+| `.git`, `.gitmodules` | Git 저장소 및 서브모듈 설정 |
+| `.?*` | 기타 숨김 디렉토리/파일 |
+| `target`, `build`, `dist`, `out` | 빌드 산출물 |
+| `node_modules`, `.gradle` | 패키지/빌드 캐시 |
+| `*.bak`, `*.tmp`, `*.log` | 임시 파일 |
+| `*.class`, `*.pyc`, `__pycache__` | 컴파일 산출물 |
+| `._*`, `.DS_Store` | macOS 시스템 파일 |
+| `.gitignore` 패턴 | 프로젝트 내 모든 `.gitignore` 적용 |

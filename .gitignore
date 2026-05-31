@@ -10,6 +10,10 @@
 *.swp
 *~
 
-# 프로젝트 export 파일 (선택적)
-# project.b64
+# 프로젝트 export 파일
+project.b64
+*.b64
+
+# Claude 관련
+.claude/
 
