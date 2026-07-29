@@ -74,24 +74,58 @@ build_excludes() {
 
         local prefix="${rel:+$rel/}"
         for pat in "${exc_pats[@]+"${exc_pats[@]}"}"; do
-            # negation 패턴 중 이 패턴의 glob 범위에 포함되는 것이 있는지 확인
-            local has_overlap=false
-            for np in "${neg_pats[@]+"${neg_pats[@]}"}"; do
-                [[ "$np" == $pat ]] && has_overlap=true && break
-            done
+            # ── git 앵커링 판정 ──────────────────────────────────────────
+            #  선행 '/' 또는 내부 '/'(트레일링 제외) → .gitignore 디렉토리에 앵커
+            #  슬래시 없음(또는 트레일링만) → 어느 depth 든 매칭(floating)
+            local core="${pat#/}"; core="${core%/}"
+            local anchored=false
+            [[ "$pat" == /* || "$core" == */* ]] && anchored=true
 
-            if [[ "$has_overlap" == true ]]; then
-                # glob expand 후 negation 파일 제외
-                while IFS= read -r f; do
+            if [[ "$anchored" == true ]]; then
+                # bsdtar --exclude 는 경로 시작 앵커를 지원하지 않아(컴포넌트 suffix
+                # 매칭), 앵커 패턴을 그대로 넘기면 같은 이름의 하위 디렉토리까지
+                # 제외된다. 실제 파일시스템에 glob 확장해 확정 경로로만 제외한다.
+                while IFS= read -r m; do
+                    m="${m#./}"; [[ -z "$m" || "$m" == "." ]] && continue
+                    # negation(!) 재포함 대상은 건너뜀
                     local neg_match=false
                     for np in "${neg_pats[@]+"${neg_pats[@]}"}"; do
-                        [[ "$f" == "$np" ]] && neg_match=true && break
+                        [[ "$m" == $np || "$m" == $np/* ]] && neg_match=true && break
                     done
                     [[ "$neg_match" == true ]] && continue
-                    ex+=(--exclude="./${prefix}$f")
-                done < <(cd "$base_dir" && find . -maxdepth 1 -name "$pat" -not -name '.' | sed 's|^\./||')
+
+                    local full="${prefix}${m}"
+                    if [[ -d "$base_dir/$m" && "$full" != */* ]]; then
+                        # 루트 단일 컴포넌트 디렉토리: 디렉토리명 제외는 동일 이름의
+                        # 하위 디렉토리(예: apps/.../lib)와 충돌하므로, 직속 항목을
+                        # 2컴포넌트 확정 경로로 제외한다.
+                        while IFS= read -r child; do
+                            ex+=(--exclude="./${child#./}")
+                        done < <(cd "$PROJECT_ROOT" && find "$full" -mindepth 1 -maxdepth 1)
+                    else
+                        ex+=(--exclude="./${full}")
+                    fi
+                done < <(cd "$base_dir" 2>/dev/null && { shopt -s nullglob dotglob; for g in $core; do [[ -e "$g" || -L "$g" ]] && printf '%s\n' "$g"; done; })
             else
-                ex+=(--exclude="./${prefix}$pat")
+                # floating 패턴: 어느 depth 든 매칭(bsdtar suffix 매칭 그대로 활용)
+                # negation 패턴과 겹치면 직속 항목을 glob 확장해 개별 제외
+                local has_overlap=false
+                for np in "${neg_pats[@]+"${neg_pats[@]}"}"; do
+                    [[ "$np" == $pat ]] && has_overlap=true && break
+                done
+
+                if [[ "$has_overlap" == true ]]; then
+                    while IFS= read -r f; do
+                        local neg_match=false
+                        for np in "${neg_pats[@]+"${neg_pats[@]}"}"; do
+                            [[ "$f" == "$np" ]] && neg_match=true && break
+                        done
+                        [[ "$neg_match" == true ]] && continue
+                        ex+=(--exclude="./${prefix}$f")
+                    done < <(cd "$base_dir" && find . -maxdepth 1 -name "$pat" -not -name '.' | sed 's|^\./||')
+                else
+                    ex+=(--exclude="./${prefix}$pat")
+                fi
             fi
         done
     done < <(find "$PROJECT_ROOT" -name ".gitignore" -not -path "*/.git/*")
