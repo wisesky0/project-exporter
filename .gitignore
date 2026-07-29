@@ -16,4 +16,5 @@ project.b64
 
 # Claude 관련
 .claude/
+.serena/
 
